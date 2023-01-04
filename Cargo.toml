@@ -1,0 +1,18 @@
+[package]
+name = "max32660-hal"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+embedded-hal = "0.2.7"
+max32660-pac = "0.1.1"
+nb = "1.0.0"
+
+[dependencies.bitter]
+git = "https://github.com/amcelroy/bitter"
+version = "0.1"
+
+[lib]
+name = "max32660_hal"
+test = false
+bench = false
