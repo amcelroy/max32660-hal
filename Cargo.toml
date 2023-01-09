@@ -7,9 +7,10 @@ edition = "2021"
 embedded-hal = "0.2.7"
 max32660-pac = "0.1.1"
 nb = "1.0.0"
+libm = "0.2"
 
-[dependencies.bitter]
-git = "https://github.com/amcelroy/bitter"
+[dependencies.bitterly]
+git = "https://github.com/amcelroy/bitterly"
 version = "0.1"
 
 [lib]
