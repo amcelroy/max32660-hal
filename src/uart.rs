@@ -1,9 +1,4 @@
-use embedded_hal as hal;
 use max32660_pac;// as pac;
-use nb;
-
-use embedded_hal;
-use libm::{powf, floorf};
 
 pub enum Parity {
     Even,
@@ -65,183 +60,217 @@ pub enum UartError {
     BaudRateConfiguration,
 }
 
+pub struct UartRxFifo {
+    size: u8,
+    buffer: [u8; 8],
+}
+
+use libm::{floorf, powf};
+
 // #[macro_export]
 // macro_rules! uart {
-//     ($uart:ident) => {
-        pub fn enable_uart(uart: &max32660_pac::UART1, enable: bool) {
-            unsafe {
-                uart.ctrl.modify(|r, w| {
-                    let bits = r.bits();
-                    w.bits(bits).enable().bit(enable)
-                })
-            }
+//     ($UARTX:ident) => {
+
+        pub struct UART {
+            uart: max32660_pac::UART1,
         }
 
-        pub fn set_baud(uart: &max32660_pac::UART1, peripheral_clk: u32, baud: u32) -> Result<(), UartError> {
-
-            let mut div: f32 = 0.0;
-            let mut factor = 0;
-            for factor in 0..4 {
-                div = (peripheral_clk as f32);
-                let dividend = powf(2.0, ((7 - factor)) as f32)* (baud as f32);
-                div = div / dividend;
-                if div > 1.0 {
-                    break;
+        impl UART {
+            pub fn new(uart: max32660_pac::UART1) -> Self {
+                UART {
+                    uart: uart,
                 }
-            }   
-
-            if div < 1.0 {
-                return Err(UartError::BaudRateConfiguration);
             }
 
-            let ibaud = floorf(div);
-
-            let mut dbaud: f32 = (div - ibaud) * 128.0;
-            if dbaud > 3.0 {
-                dbaud -= 3.0;
-            }else{
-                dbaud += 3.0;
+            pub fn enable(&self) {
+                unsafe {
+                    self.uart.ctrl.modify(|r, w| {
+                        let bits = r.bits();
+                        w.bits(bits).enable().bit(true)
+                    })
+                }
             }
 
-            unsafe {
-                uart.baud0.write(|w| {
-                    w.factor().bits((factor & 0x3) as u8);
-                    w.ibaud().bits(ibaud as u16)
-                });
+            pub fn set_baud(&self, peripheral_clk: u32, baud: u32) -> Result<&Self, UartError> {
 
-                uart.baud1.write(|w| {
-                    w.dbaud().bits(dbaud as u16)
-                })
-            }
-
-            Ok(())
-        }
-
-        pub fn enable_interrupts(uart: &max32660_pac::UART1, ints: &[Interrupts]) {
-            let mut interrupt_final: u16 = 0;
-            
-            for int in ints {
-                interrupt_final |= *int as u16;
-            }
-
-            unsafe {
-                uart.int_en.write(|w| {
-                    w.bits(interrupt_final as u32)
-                })
-            }
-        }
-
-        pub fn set_flow_control(uart: &max32660_pac::UART1, enable: bool, polarity: FlowControlPolarity) {
-            unsafe {
-                uart.ctrl.modify(|r, w| {
-                    let pol = match polarity {
-                        FlowControlPolarity::AssertZero => { false },
-                        FlowControlPolarity::AssertOne => { true }
-                    };
-
-                    w.bits(r.bits()).flow_ctrl().bit(enable).flow_pol().bit(pol)
-                })
-            }
-        }
-
-        pub fn set_char_size(uart: &max32660_pac::UART1, s: CharSize) {
-            unsafe {
-                uart.ctrl.modify(|r, w| {
-                    w.bits(r.bits()).char_size().bits(s as u8)
-                })
-            }
-        }
-
-        pub fn set_parity(uart: &max32660_pac::UART1, enable: bool, parity: Parity, level: ParityLevel) {
-            todo!("Configure parity")
-        }
-
-        pub fn set_stop_bit(uart: &max32660_pac::UART1, stop: StopBits) {
-            
-
-            let stop_bool = match stop {
-                StopBits::_1 => { false },
-                _ => { true }
-            };
-
-            unsafe {
-                uart.ctrl.modify(|r, w| {
-                    if stop_bool {
-                        w.bits(r.bits()).stopbits()._1()
-                    }else{
-                        w.bits(r.bits()).stopbits()._1_5()
+                let mut div: f32 = 0.0;
+                let mut factor = 0;
+                for factor in 0..4 {
+                    div = (peripheral_clk as f32);
+                    let dividend = powf(2.0, ((7 - factor)) as f32)* (baud as f32);
+                    div = div / dividend;
+                    if div > 1.0 {
+                        break;
                     }
-                })
-            }
-        }
+                }   
 
-        pub fn flush_rx_fifo(uart: &max32660_pac::UART1) {
-            unsafe {
-                uart.ctrl.modify(|r, w| {
-                    w.bits(r.bits()).rx_flush().set_bit()
-                })
-            }
-        }
+                if div < 1.0 {
+                    return Err(UartError::BaudRateConfiguration);
+                }
 
-        pub fn flush_tx_fifo(uart: &max32660_pac::UART1) {
-            unsafe {
-                uart.ctrl.modify(|r, w| {
-                    w.bits(r.bits()).tx_flush().set_bit()
-                })
-            }
-        }
+                let ibaud = floorf(div);
 
-        pub fn set_rx_fifo_threshold(uart: &max32660_pac::UART1, threshold: FifoThreshold) {
-            unsafe {
-                uart.thresh_ctrl.modify(|r, w| {
-                    w.bits(r.bits()).rx_fifo_thresh().bits(threshold as u8)
-                })
-            }
-        }
+                let mut dbaud: f32 = (div - ibaud) * 128.0;
+                if dbaud > 3.0 {
+                    dbaud -= 3.0;
+                }else{
+                    dbaud += 3.0;
+                }
 
-        pub fn set_tx_fifo_threshold(uart: &max32660_pac::UART1, threshold: FifoThreshold) {
-            unsafe {
-                uart.thresh_ctrl.modify(|r, w| {
-                    w.bits(r.bits()).tx_fifo_thresh().bits(threshold as u8)
-                })
-            }
-        }
+                unsafe {
+                    self.uart.baud0.write(|w| {
+                        w.factor().bits((factor & 0x3) as u8);
+                        w.ibaud().bits(ibaud as u16)
+                    });
 
-        pub fn set_rts_fifo_threshold(uart: &max32660_pac::UART1, threshold: FifoThreshold) {
-            unsafe {
-                uart.thresh_ctrl.modify(|r, w| {
-                    w.bits(r.bits()).rts_fifo_thresh().bits(threshold as u8)
-                })
-            }
-        }
+                    self.uart.baud1.write(|w| {
+                        w.dbaud().bits(dbaud as u16)
+                    })
+                }
 
-        /// Read a byte from the UART FIFO buffer
-        pub fn read(uart: &max32660_pac::UART1) -> u8 {
-            uart.fifo.read().fifo().bits()
-        }
-
-        /// Writes a byte to the UART FIFO, returns number of bytes in the FIFO
-        pub fn write(uart: &max32660_pac::UART1, byte: u8) -> u8 {
-            unsafe {
-                uart.fifo.write(|w| {
-                    w.fifo().bits(byte)
-                })
+                Ok(self)
             }
 
-            uart.tx_fifo.read().data().bits()
-        }
+            pub fn enable_interrupts(&self, ints: &[Interrupts]) -> &Self {
+                let mut interrupt_final: u16 = 0;
+                
+                for int in ints {
+                    interrupt_final |= *int as u16;
+                }
 
-        pub fn clear_interrupt(uart: &max32660_pac::UART1, ints: &[Interrupts]) {
-            let mut interrupt_final: u32 = 0;
+                unsafe {
+                    self.uart.int_en.write(|w| {
+                        w.bits(interrupt_final as u32)
+                    })
+                }
+
+                self
+            }
+
+            pub fn set_flow_control(&self, enable: bool, polarity: FlowControlPolarity) -> &Self {
+                unsafe {
+                    self.uart.ctrl.modify(|r, w| {
+                        let pol = match polarity {
+                            FlowControlPolarity::AssertZero => { false },
+                            FlowControlPolarity::AssertOne => { true }
+                        };
+
+                        w.bits(r.bits()).flow_ctrl().bit(enable).flow_pol().bit(pol)
+                    })
+                }
+
+                self
+            }
+
+            pub fn set_char_size(&self, s: CharSize) -> &Self {
+                unsafe {
+                    self.uart.ctrl.modify(|r, w| {
+                        w.bits(r.bits()).char_size().bits(s as u8)
+                    })
+                }
+
+                self
+            }
+
+            pub fn set_parity(&self, enable: bool, parity: Parity, level: ParityLevel) {
+                todo!("Configure parity")
+            }
+
+            pub fn set_stop_bit(&self, stop: StopBits) -> &Self {
+                
+
+                let stop_bool = match stop {
+                    StopBits::_1 => { false },
+                    _ => { true }
+                };
+
+                unsafe {
+                    self.uart.ctrl.modify(|r, w| {
+                        if stop_bool {
+                            w.bits(r.bits()).stopbits()._1()
+                        }else{
+                            w.bits(r.bits()).stopbits()._1_5()
+                        }
+                    })
+                }
+
+                self
+            }
+
+            pub fn flush_rx_fifo(&self) {
+                unsafe {
+                    self.uart.ctrl.modify(|r, w| {
+                        w.bits(r.bits()).rx_flush().set_bit()
+                    })
+                }
+            }
+
+            pub fn flush_tx_fifo(&self) {
+                unsafe {
+                    self.uart.ctrl.modify(|r, w| {
+                        w.bits(r.bits()).tx_flush().set_bit()
+                    })
+                }
+            }
+
+            pub fn set_rx_fifo_threshold(&self, threshold: FifoThreshold) -> &Self {
+                unsafe {
+                    self.uart.thresh_ctrl.modify(|r, w| {
+                        w.bits(r.bits()).rx_fifo_thresh().bits(threshold as u8)
+                    })
+                }
+
+                self
+            }
+
+            pub fn set_tx_fifo_threshold(&self, threshold: FifoThreshold) {
+                unsafe {
+                    self.uart.thresh_ctrl.modify(|r, w| {
+                        w.bits(r.bits()).tx_fifo_thresh().bits(threshold as u8)
+                    })
+                }
+            }
+
+            pub fn set_rts_fifo_threshold(&self, threshold: FifoThreshold) {
+                unsafe {
+                    self.uart.thresh_ctrl.modify(|r, w| {
+                        w.bits(r.bits()).rts_fifo_thresh().bits(threshold as u8)
+                    })
+                }
+            }
+
+            /// Read a byte from the UART FIFO buffer
+            pub fn read(&self) -> u8 {
+                self.uart.fifo.read().fifo().bits()
+            }
+
+            pub fn rx_fifo_cnt(&self) -> u8 {
+                self.uart.status.read().rx_fifo_cnt().bits()
+            }
             
-            for int in ints {
-                interrupt_final |= *int as u32;
+            /// Writes a byte to the UART FIFO, returns number of bytes in the FIFO
+            pub fn write(&self, byte: u8) -> u8 {
+                unsafe {
+                    self.uart.fifo.write(|w| {
+                        w.fifo().bits(byte)
+                    })
+                }
+
+                self.uart.tx_fifo.read().data().bits()
             }
 
-            unsafe {
-                uart.int_fl.write(|w| {
-                    w.bits(interrupt_final)
-                })
+            pub fn clear_interrupt(&self, ints: &[Interrupts]) {
+                let mut interrupt_final: u32 = 0;
+                
+                for int in ints {
+                    interrupt_final |= *int as u32;
+                }
+
+                unsafe {
+                    self.uart.int_fl.write(|w| {
+                        w.bits(interrupt_final)
+                    })
+                }
             }
         }
 //     }
