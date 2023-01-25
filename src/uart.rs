@@ -248,15 +248,29 @@ use libm::{floorf, powf};
                 self.uart.status.read().rx_fifo_cnt().bits()
             }
             
-            /// Writes a byte to the UART FIFO, returns number of bytes in the FIFO
-            pub fn write(&self, byte: u8) -> u8 {
+            /// Writes a byte to the UART FIFO, returns true if the FIFO is full
+            pub fn write(&self, byte: u8) -> bool {
                 unsafe {
                     self.uart.fifo.write(|w| {
                         w.fifo().bits(byte)
                     })
                 }
 
-                self.uart.tx_fifo.read().data().bits()
+                self.tx_fifo_full()
+            }
+
+            pub fn write_blocking(&self, bytes: &[u8]) {
+                let mut full = false;
+                for byte in bytes {
+                    full = self.write(*byte);
+                    if full {
+                        while self.tx_fifo_full(){} // block until there is room
+                    }
+                }  
+            }
+
+            pub fn tx_fifo_full(&self) -> bool {
+                self.uart.status.read().tx_full().bit()
             }
 
             pub fn clear_interrupt(&self, ints: &[Interrupts]) {

@@ -46,17 +46,22 @@ pub enum IntThresh {
     _8,
 }
 
+const READ_BIT: u8 = 0x80;
+const WRITE_BIT: u8 = 0x00;
+
 pub struct I2C {
-    i2c: max32660_pac::I2C0,
+    i2c: max32660_pac::I2C1,
     busy: bool,
+    ack: bool,
 }
 
 impl I2C {
 
-    pub fn new(i2c: max32660_pac::I2C0) -> Self {
+    pub fn new(i2c: max32660_pac::I2C1) -> Self {
         I2C {
             i2c: i2c,
             busy: false,
+            ack: false,
         }
     } 
 
@@ -143,25 +148,43 @@ impl I2C {
     }
 
     pub fn master_write_blocking(&self, data: &[u8]) {
-        // TODO: Flush TX fifo first?
+        // // TODO: Flush TX fifo first?
 
-        // Write data to buffer
-        for b in data {
-            unsafe {
-                self.i2c.fifo.write(|w| w.data().bits(*b))
-            }
-        }
+        // // Write data to buffer
+        // for b in data {
+        //     unsafe {
+        //         self.i2c.fifo.write(|w| w.data().bits(*b))
+        //     }
+        // }
 
+        // unsafe {
+        //     // Put device in master mode
+        //     self.i2c.ctrl.modify(|r, w| {
+        //         w.bits(r.bits()).mst().set_bit()
+        //     });
+
+        //     self.i2c.master_ctrl.modify(|r, w| {
+        //         w.bits(r.bits()).start().set_bit()
+        //     });
+        // }
+    }
+
+    pub fn master_read(&mut self, slave_address: u8, memory_address: u8, bytes_to_read: u8) {
         unsafe {
-            // Put device in master mode
-            self.i2c.ctrl.modify(|r, w| {
-                w.bits(r.bits()).mst().set_bit()
+            self.i2c.rx_ctrl1.modify(|r, w| {
+                w.bits(r.bits()).rx_cnt().bits(bytes_to_read)
             });
 
+            self.i2c.fifo.write(|w| {
+                w.data().bits(slave_address)
+            });
+            
             self.i2c.master_ctrl.modify(|r, w| {
                 w.bits(r.bits()).start().set_bit()
             });
         }
+
+        self.busy = true;
     }
 
     //pub fn 
