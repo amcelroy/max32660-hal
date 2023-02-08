@@ -6,7 +6,6 @@
 // }
 
 use embedded_hal;
-use bitterly::Register32;
 use max32660_pac::generic::Reg;
 
 #[derive(Copy, Clone)]
@@ -77,28 +76,20 @@ pub enum Resistor {
     PullDown,
 }   
 
-fn toBit32(pin: Pins) -> bitterly::Bit32 {
-    match (pin as u32) {
-        0 => { bitterly::Bit32::_0 },
-        1 => { bitterly::Bit32::_1 },
-        2 => { bitterly::Bit32::_2 },
-        3 => { bitterly::Bit32::_3 },
-        4 => { bitterly::Bit32::_4 },
-        5 => { bitterly::Bit32::_5 },
-        6 => { bitterly::Bit32::_6 },
-        7 => { bitterly::Bit32::_7 },
-        8 => { bitterly::Bit32::_8 },
-        9 => { bitterly::Bit32::_9 },
-        10 => { bitterly::Bit32::_10 },
-        11 => { bitterly::Bit32::_11 },
-        12 => { bitterly::Bit32::_12 },
-        13 => { bitterly::Bit32::_13 },
-        _ => { bitterly::Bit32::_0 }
-    }
-}
-
 fn interrupts(gpio0: max32660_pac::GPIO0, enable: bool) {
 
+}
+
+fn pin_mask(pin: u8) -> u32 {
+    1 << pin
+}
+
+fn pin_clear(input: u32, pin: u8) -> u32 {
+    input & !pin_mask(pin)
+}
+
+fn pin_set(input: u32, pin: u8) -> u32 {
+    input & pin_mask(pin)
 }
 
 fn create_pin(gpio0: &max32660_pac::GPIO0, pin: Pins, function: Function) {
@@ -114,25 +105,25 @@ fn create_pin(gpio0: &max32660_pac::GPIO0, pin: Pins, function: Function) {
         let mut reg = 0;
         gpio0.en.modify(|r, w| {  
             if en_regs[0] {
-                reg = Register32::new(r.bits()).set(toBit32(pin)).value();
+                reg = pin_set(r.bits(), pin as u8);
             }else{
-                reg = Register32::new(r.bits()).clear(toBit32(pin)).value();
+                reg = pin_clear(r.bits(), pin as u8);
             } 
             w.bits(reg)
         });
         gpio0.en1.modify(|r, w| {
             if en_regs[1] {
-                reg = Register32::new(r.bits()).set(toBit32(pin)).value();
+                reg = pin_set(r.bits(), pin as u8);
             }else{
-                reg = Register32::new(r.bits()).clear(toBit32(pin)).value();
+                reg = pin_clear(r.bits(), pin as u8);
             } 
             w.bits(reg)
         });
         gpio0.en2.modify(|r, w| {
             if en_regs[2] {
-                reg = Register32::new(r.bits()).set(toBit32(pin)).value();
+                reg = pin_set(r.bits(), pin as u8);
             }else{
-                reg = Register32::new(r.bits()).clear(toBit32(pin)).value();
+                reg = pin_clear(r.bits(), pin as u8);
             } 
             w.bits(reg)
         });
@@ -156,23 +147,23 @@ pub fn create_input_pin(gpio0: &max32660_pac::GPIO0, pin: Pins, resistor: Resist
     // Note pad_cfg2 is not used for this part
     unsafe {
         gpio0.pad_cfg1.modify(|r, w| {
-            let mut reg = Register32::new(r.bits());
+            let mut reg = r.bits();
             if pad {
-                reg = reg.set(toBit32(pin));
+                reg = pin_set(reg, pin as u8);
             }else{
-                reg = reg.clear(toBit32(pin));
+                reg = pin_clear(reg, pin as u8);
             }
-            w.bits(reg.value())
+            w.bits(reg)
         });
 
         gpio0.ps.modify(|r, w| {
-            let mut reg = Register32::new(r.bits());
+            let mut reg = r.bits();
             if ps {
-                reg = reg.set(toBit32(pin));
+                reg = pin_set(reg, pin as u8);
             }else{
-                reg = reg.clear(toBit32(pin));
+                reg = pin_clear(reg, pin as u8);
             }
-            w.bits(reg.value())
+            w.bits(reg)
         });
     }
 
@@ -190,8 +181,13 @@ pub enum InputPinErrors {
 
 impl InputPin<'_> {
     fn read(self) -> Result<bool, InputPinErrors> {
-        let reg = Register32::new(self.pin.gpio.in_.read().bits());
-        Ok(reg.is_set(toBit32(self.pin.pin)))
+        let mut reg = self.pin.gpio.in_.read().bits();
+        reg = reg >> self.pin.pin as u8;
+        if reg == 0 {
+            Ok(false)
+        }else{
+            Ok(true)
+        }
     }
 }
 
@@ -209,26 +205,26 @@ pub fn create_output_pin(gpio0: &max32660_pac::GPIO0, pin: Pins, drive: DriveStr
 
     unsafe {
         gpio0.out_en.modify(|r, w| {
-            let mut reg = Register32::new(r.bits());
-            reg = reg.set(toBit32(pin));
-            w.bits(reg.value())
+            let mut reg = r.bits();
+            reg = pin_set(reg, pin as u8);
+            w.bits(reg)
         });
 
         gpio0.ds.modify(|r, w| {
-            let reg = Register32::new(r.bits());
+            let reg = r.bits();
             if ds[0] {
-                w.bits(reg.set(toBit32(pin)).value())   
+                w.bits(pin_set(reg, pin as u8))   
             }else{
-                w.bits(reg.clear(toBit32(pin)).value())  
+                w.bits(pin_clear(reg, pin as u8))  
             }
         });
 
         gpio0.ds1.modify(|r, w| {
-            let reg = Register32::new(r.bits());
+            let reg = r.bits();
             if ds[1] {
-                w.bits(reg.set(toBit32(pin)).value())   
+                w.bits(pin_set(reg, pin as u8))   
             }else{
-                w.bits(reg.clear(toBit32(pin)).value())  
+                w.bits(pin_clear(reg, pin as u8))  
             }
         });
     }
@@ -249,7 +245,7 @@ impl OutputPin<'_> {
     fn pin_high(self) -> Result<(), OutputPinErrors> {
         unsafe {
             self.pin.gpio.out_set.write(|w| {
-                w.bits(toBit32(self.pin.pin) as u32)
+                w.bits(pin_set(0, self.pin.pin as u8))
             });
         }
         Ok(())
@@ -258,7 +254,7 @@ impl OutputPin<'_> {
     fn pin_low(self) -> Result<(), OutputPinErrors> {
         unsafe {
             self.pin.gpio.out_clr.write(|w| {
-                w.bits(toBit32(self.pin.pin) as u32)
+                w.bits(pin_set(0, self.pin.pin as u8))
             });
         }
         Ok(())

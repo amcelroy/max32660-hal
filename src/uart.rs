@@ -1,4 +1,4 @@
-use max32660_pac;// as pac;
+use libm::{powf, floorf};
 
 pub enum Parity {
     Even,
@@ -65,19 +65,16 @@ pub struct UartRxFifo {
     buffer: [u8; 8],
 }
 
-use libm::{floorf, powf};
-
-// #[macro_export]
-// macro_rules! uart {
-//     ($UARTX:ident) => {
-
-        pub struct UART {
-            uart: max32660_pac::UART1,
+#[macro_export]
+macro_rules! uart {
+    ($UARTX:ty, $name:ident) => {
+        pub struct $name {
+            uart: $UARTX,
         }
 
-        impl UART {
-            pub fn new(uart: max32660_pac::UART1) -> Self {
-                UART {
+        impl $name {
+            pub fn new(uart: $UARTX) -> Self {
+                $name {
                     uart: uart,
                 }
             }
@@ -287,5 +284,8 @@ use libm::{floorf, powf};
                 }
             }
         }
-//     }
-// }
+    }
+}
+
+uart!(max32660_pac::UART0, Uart0);
+uart!(max32660_pac::UART1, Uart1);
