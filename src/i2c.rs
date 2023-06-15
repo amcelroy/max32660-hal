@@ -287,7 +287,6 @@ macro_rules! i2c {
                     });
                 }
         
-        
                 let mut bytes_to_read_adjusted: usize = bytes_to_read as usize;
                 if bytes_to_read == 0 {
                     bytes_to_read_adjusted = 256;
