@@ -89,7 +89,7 @@ fn pin_clear(input: u32, pin: u8) -> u32 {
 }
 
 fn pin_set(input: u32, pin: u8) -> u32 {
-    input & pin_mask(pin)
+    input | pin_mask(pin)
 }
 
 fn create_pin(gpio0: &max32660_pac::GPIO0, pin: Pins, function: Function) {
