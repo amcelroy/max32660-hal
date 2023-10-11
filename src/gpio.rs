@@ -267,6 +267,18 @@ macro_rules! gpio {
                         .write(|w| w.bits(pin_set(0, self.pin as u8)));
                 }
             }
+
+            pub fn status(&self) -> bool {
+                unsafe {
+                    let mut reg = (*<$GPIOX>::ptr()).out.read().bits();
+                    reg &= 1 << self.pin as u8;
+                    if reg == 0 {
+                        false
+                    } else {
+                        true
+                    }
+                }
+            }
         }
 
         impl InputPin {
