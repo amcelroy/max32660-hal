@@ -99,12 +99,10 @@ macro_rules! gpio {
 
         pub struct OutputPin {
             pin: Pins,
-            gpio: $GPIOX,
         }
 
         pub struct InputPin {
             pin: Pins,
-            gpio: $GPIOX,
         }
 
         impl $name {
@@ -206,7 +204,6 @@ macro_rules! gpio {
 
                 InputPin {
                     pin: pin,
-                    gpio: self.gpio,
                 }
             }
 
@@ -250,7 +247,6 @@ macro_rules! gpio {
 
                 OutputPin {
                     pin: pin,
-                    gpio: self.gpio,
                 }
             }
         }
@@ -258,7 +254,7 @@ macro_rules! gpio {
         impl OutputPin {
             pub fn pin_high(self) {
                 unsafe {
-                    self.gpio
+                    (*<$GPIOX>::ptr())
                         .out_set
                         .write(|w| w.bits(pin_set(0, self.pin as u8)));
                 }
@@ -266,7 +262,7 @@ macro_rules! gpio {
 
             pub fn pin_low(self) {
                 unsafe {
-                    self.gpio
+                    (*<$GPIOX>::ptr())
                         .out_clr
                         .write(|w| w.bits(pin_set(0, self.pin as u8)));
                 }
@@ -275,28 +271,32 @@ macro_rules! gpio {
 
         impl InputPin {
             pub fn read(self) -> bool {
-                let mut reg = self.gpio.in_.read().bits();
-                reg &= 1 << self.pin as u8;
-                if reg == 0 {
-                    false
-                } else {
-                    true
+                unsafe {
+                    let mut reg = (*<$GPIOX>::ptr()).in_.read().bits();
+                    reg &= 1 << self.pin as u8;
+                    if reg == 0 {
+                        false
+                    } else {
+                        true
+                    }
                 }
             }
 
             pub fn is_interrupting(self) -> bool {
-                let mut reg = self.gpio.int_stat.read().bits();
-                reg &= 1 << self.pin as u8;
-                if reg == 0 {
-                    false
-                } else {
-                    true
+                unsafe {
+                    let mut reg = (*<$GPIOX>::ptr()).int_stat.read().bits();
+                    reg &= 1 << self.pin as u8;
+                    if reg == 0 {
+                        false
+                    } else {
+                        true
+                    }
                 }
             }
 
             pub fn enable_interrupt(&self) {
                 unsafe {
-                    self.gpio.int_en.modify(|r, w| {
+                    (*<$GPIOX>::ptr()).int_en.modify(|r, w| {
                         let mut reg = r.bits();
                         reg = pin_set(reg, self.pin as u8);
                         w.bits(reg)
@@ -306,7 +306,7 @@ macro_rules! gpio {
 
             pub fn disable_interrupt(&self) {
                 unsafe {
-                    self.gpio.int_en.modify(|r, w| {
+                    (*<$GPIOX>::ptr()).int_en.modify(|r, w| {
                         let mut reg = r.bits();
                         reg = pin_clear(reg, self.pin as u8);
                         w.bits(reg)
@@ -316,7 +316,7 @@ macro_rules! gpio {
 
             pub fn clear_interrupt(&self) {
                 unsafe {
-                    self.gpio.int_clr.modify(|r, w| {
+                    (*<$GPIOX>::ptr()).int_clr.modify(|r, w| {
                         let mut reg = r.bits();
                         reg = pin_set(reg, self.pin as u8);
                         w.bits(reg)
@@ -326,7 +326,7 @@ macro_rules! gpio {
 
             fn set_level_edge_interrupt(&self, mode: InterruptMode) {
                 unsafe {
-                    self.gpio.int_mod.modify(|r, w| {
+                    (*<$GPIOX>::ptr()).int_mod.modify(|r, w| {
                         let mut reg = r.bits();
 
                         if mode == InterruptMode::Edge {
@@ -346,7 +346,7 @@ macro_rules! gpio {
                 self.set_level_edge_interrupt(InterruptMode::Level);
 
                 unsafe {
-                    self.gpio.int_pol.modify(|r, w| {
+                    (*<$GPIOX>::ptr()).int_pol.modify(|r, w| {
                         let mut reg = r.bits();
 
                         if level == InterruptLevelPolarity::High {
@@ -368,7 +368,7 @@ macro_rules! gpio {
                 self.set_level_edge_interrupt(InterruptMode::Edge);
 
                 unsafe {
-                    self.gpio.int_pol.modify(|r, w| {
+                    (*<$GPIOX>::ptr()).int_pol.modify(|r, w| {
                         let mut reg = r.bits();
 
                         if edge == InterruptEdgePolarity::Rising {
