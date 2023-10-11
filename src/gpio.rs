@@ -158,7 +158,7 @@ macro_rules! gpio {
             }
 
             /// Create's an input pin, see GPIO -> InputMode Configuration
-            pub fn create_input_pin(&mut self, pin: Pins, resistor: Resistor) -> InputPin {
+            pub fn create_input_pin(&self, pin: Pins, resistor: Resistor) -> InputPin {
                 self.create_pin(pin, Function::Input);
 
                 let mut pad = false;
@@ -252,7 +252,7 @@ macro_rules! gpio {
         }
 
         impl OutputPin {
-            pub fn pin_high(self) {
+            pub fn pin_high(&self) {
                 unsafe {
                     (*<$GPIOX>::ptr())
                         .out_set
@@ -260,7 +260,7 @@ macro_rules! gpio {
                 }
             }
 
-            pub fn pin_low(self) {
+            pub fn pin_low(&self) {
                 unsafe {
                     (*<$GPIOX>::ptr())
                         .out_clr
@@ -270,7 +270,7 @@ macro_rules! gpio {
         }
 
         impl InputPin {
-            pub fn read(self) -> bool {
+            pub fn read(&self) -> bool {
                 unsafe {
                     let mut reg = (*<$GPIOX>::ptr()).in_.read().bits();
                     reg &= 1 << self.pin as u8;
@@ -282,7 +282,7 @@ macro_rules! gpio {
                 }
             }
 
-            pub fn is_interrupting(self) -> bool {
+            pub fn is_interrupting(&self) -> bool {
                 unsafe {
                     let mut reg = (*<$GPIOX>::ptr()).int_stat.read().bits();
                     reg &= 1 << self.pin as u8;
@@ -362,7 +362,7 @@ macro_rules! gpio {
                 }
             }
 
-            pub fn enable_edge_interrupt(self, edge: InterruptEdgePolarity) {
+            pub fn enable_edge_interrupt(&self, edge: InterruptEdgePolarity) {
                 self.clear_interrupt();
                 self.disable_interrupt();
                 self.set_level_edge_interrupt(InterruptMode::Edge);
@@ -371,7 +371,7 @@ macro_rules! gpio {
                     (*<$GPIOX>::ptr()).int_pol.modify(|r, w| {
                         let mut reg = r.bits();
 
-                        if edge == InterruptEdgePolarity::Rising {
+                        if edge == InterruptEdgePolarity::Falling {
                             reg = pin_set(reg, self.pin as u8);
                         } else {
                             reg = pin_clear(reg, self.pin as u8);
