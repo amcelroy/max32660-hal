@@ -11,7 +11,7 @@ pub enum TimerMode {
 macro_rules! timer {
     ($tim:ty, $name:ident) => {
         pub struct $name {
-            cpu_clk_hz: f32,
+            peripheral_clk_hz: f32,
             timer: $tim,
         }
 
@@ -22,9 +22,9 @@ macro_rules! timer {
             }
 
             /// Creates a new timer with a default period of 1 second.
-            pub fn new(timer: $tim, cpu_clk_hz: f32) -> Self {
+            pub fn new(timer: $tim, peripheral_clk_hz: f32) -> Self {
                 Self {
-                    cpu_clk_hz,
+                    peripheral_clk_hz,
                     timer: timer,
                 }
             }
@@ -32,7 +32,7 @@ macro_rules! timer {
             /// Disables the timer and sets a new count based on timer frequency
             pub fn set_freq(&mut self, hz: f32) -> &mut Self {
                 self.disable();
-                let count = (self.cpu_clk_hz / hz) as u32;
+                let count = (self.peripheral_clk_hz / hz) as u32;
                 unsafe {
                     self.timer.cmp.write(|w| w.bits(count));
                 }
